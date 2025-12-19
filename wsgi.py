@@ -1,7 +1,16 @@
-from app import create_app
-from config import Config
+import sys
+import traceback
 
-application = create_app()
+try:
+    from app import create_app
+    from config import Config
+
+    application = create_app()
+    print("Application created successfully!", file=sys.stderr)
+except Exception as e:
+    print(f"ERROR creating application: {e}", file=sys.stderr)
+    traceback.print_exc(file=sys.stderr)
+    raise
 
 if __name__ == '__main__':
     application.run(

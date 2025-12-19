@@ -23,4 +23,4 @@ EXPOSE 5000
 
 # Run with gunicorn for production
 RUN pip install gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "300", "wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "300", "--log-level", "debug", "--access-logfile", "-", "--error-logfile", "-", "wsgi:application"]
