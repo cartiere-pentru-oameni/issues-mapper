@@ -25,10 +25,22 @@ def create_app(config_class=Config):
     app.register_blueprint(statistics_bp, url_prefix='/statistics')
     app.register_blueprint(admin_bp, url_prefix='/admin')
 
+    # Health check endpoint
+    @app.route('/health')
+    def health():
+        return {'status': 'healthy'}, 200
+
     # Root route
     @app.route('/')
     def index():
         from flask import redirect, url_for
         return redirect(url_for('auth.login'))
+
+    # Add logging for all requests
+    @app.before_request
+    def log_request():
+        import logging
+        from flask import request
+        logging.info(f"Request: {request.method} {request.path}")
 
     return app
