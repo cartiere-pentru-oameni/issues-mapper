@@ -1,0 +1,89 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Issues List{% endblock %}
+{% block page_title %}All Reported Issues{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap4.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Issues List</h3>
+                <div class="card-tools">
+                    <a href="{{ url_for('issues.export') }}" class="btn btn-success btn-sm">
+                        <i class="fas fa-file-csv"></i> Export to CSV
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <table id="issuesTable" class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Type</th>
+                            <th>Location</th>
+                            <th>Timestamp</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data loaded via DataTables AJAX -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap4.min.js"></script>
+<script>
+$(document).ready(function() {
+    const table = $('#issuesTable').DataTable({
+        processing: true,
+        serverSide: false, // Will be true when backend is implemented
+        ajax: {
+            url: '{{ url_for("issues.get_issues") }}',
+            dataSrc: 'data'
+        },
+        columns: [
+            { data: 'id' },
+            { data: 'type' },
+            {
+                data: null,
+                render: function(data) {
+                    if (data.latitude && data.longitude) {
+                        return `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`;
+                    }
+                    return '<span class="text-muted">No location</span>';
+                }
+            },
+            {
+                data: 'timestamp',
+                render: function(data) {
+                    return data || '<span class="text-muted">No timestamp</span>';
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                render: function(data) {
+                    return `
+                        <a href="/issues/${data.id}" class="btn btn-sm btn-info">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                    `;
+                }
+            }
+        ],
+        order: [[0, 'desc']]
+    });
+});
+</script>
+{% endblock %}

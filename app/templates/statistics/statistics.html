@@ -1,0 +1,139 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Statistics{% endblock %}
+{% block page_title %}Statistics & Reports{% endblock %}
+
+{% block content %}
+<!-- Summary Cards -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card card-primary">
+            <div class="card-body text-center">
+                <h1 id="totalIssues" class="display-3">0</h1>
+                <p class="lead">Total Issues Reported</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Issues by Type</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="issuesByTypeChart" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Issue Types Over Time</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="timelineChart" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Load summary statistics
+    $.ajax({
+        url: '{{ url_for("statistics.get_summary") }}',
+        success: function(data) {
+            $('#totalIssues').text(data.total_issues);
+        }
+    });
+
+    // Issues by Type Chart
+    $.ajax({
+        url: '{{ url_for("statistics.get_by_type") }}',
+        success: function(data) {
+            const ctx = document.getElementById('issuesByTypeChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 206, 86, 0.7)',
+                            'rgba(75, 192, 192, 0.7)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+    });
+
+    // Timeline Chart - Issues by Type Over Time
+    $.ajax({
+        url: '{{ url_for("statistics.get_timeline") }}',
+        success: function(data) {
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            const colorPalette = [
+                'rgb(255, 99, 132)',
+                'rgb(54, 162, 235)',
+                'rgb(255, 206, 86)',
+                'rgb(75, 192, 192)',
+                'rgb(153, 102, 255)',
+                'rgb(255, 159, 64)',
+                'rgb(201, 203, 207)',
+                'rgb(255, 99, 71)'
+            ];
+
+            const datasets = data.datasets.map((ds, idx) => ({
+                label: ds.label,
+                data: ds.data,
+                borderColor: colorPalette[idx % colorPalette.length],
+                backgroundColor: colorPalette[idx % colorPalette.length],
+                borderWidth: 2,
+                fill: false,
+                tension: 0.1
+            }));
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

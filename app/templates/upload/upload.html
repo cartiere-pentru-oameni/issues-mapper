@@ -1,0 +1,220 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Upload Issues{% endblock %}
+{% block page_title %}Upload Issue Photos{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Upload Photos</h3>
+            </div>
+            <div class="card-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label>Select Photos</label>
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" id="fileInput" name="files[]" multiple accept="image/*" required>
+                            <label class="custom-file-label" for="fileInput">Choose files...</label>
+                        </div>
+                        <small class="form-text text-muted">You can select multiple photos at once.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Default Issue Type (Optional)</label>
+                        <select class="form-control" id="defaultIssueType">
+                            <option value="">-- Select to apply to all --</option>
+                            {% for issue_type in issue_types %}
+                            <option value="{{ issue_type.id }}">{{ issue_type.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">This will apply to all uploaded images. You can change individual assignments below.</small>
+                    </div>
+
+                    <div id="previewContainer" class="row mt-3"></div>
+
+                    <div class="form-group mt-3">
+                        <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                            <i class="fas fa-upload"></i> Upload Photos
+                        </button>
+                    </div>
+                </form>
+
+                <div id="progressSection" style="display: none;">
+                    <div class="progress">
+                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <p id="progressText" class="mt-2 text-center"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Instructions</h3>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li>Select one or more photos from citizens</li>
+                    <li>Optionally set a default issue type for all photos</li>
+                    <li>Review the preview and adjust issue types individually if needed</li>
+                    <li>Click Upload to process the photos</li>
+                </ol>
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle"></i>
+                    GPS coordinates and timestamps will be automatically extracted from photo metadata.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    const fileInput = $('#fileInput');
+    const previewContainer = $('#previewContainer');
+    const uploadBtn = $('#uploadBtn');
+    const defaultIssueType = $('#defaultIssueType');
+    let selectedFiles = [];
+
+    // Update file input label
+    fileInput.on('change', function() {
+        const files = Array.from(this.files);
+        const label = $(this).next('.custom-file-label');
+
+        if (files.length > 0) {
+            selectedFiles = files;
+            label.html(files.length + ' file(s) selected');
+            uploadBtn.prop('disabled', false);
+            showPreviews();
+        } else {
+            selectedFiles = [];
+            label.html('Choose files...');
+            uploadBtn.prop('disabled', true);
+            previewContainer.empty();
+        }
+    });
+
+    // Apply default issue type to all
+    defaultIssueType.on('change', function() {
+        const typeId = $(this).val();
+        $('.issue-type-select').val(typeId);
+    });
+
+    function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        const label = fileInput.next('.custom-file-label');
+
+        if (selectedFiles.length > 0) {
+            label.html(selectedFiles.length + ' file(s) selected');
+            showPreviews();
+        } else {
+            label.html('Choose files...');
+            uploadBtn.prop('disabled', true);
+            previewContainer.empty();
+        }
+    }
+
+    function showPreviews() {
+        previewContainer.empty();
+
+        selectedFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = `
+                    <div class="col-md-6 mb-3" data-index="${index}">
+                        <div class="card">
+                            <div class="card-header bg-light p-2">
+                                <button type="button" class="btn btn-danger btn-sm float-right remove-btn" data-index="${index}">
+                                    <i class="fas fa-times"></i> Remove
+                                </button>
+                                <small class="text-muted">${file.name}</small>
+                            </div>
+                            <img src="${e.target.result}" class="card-img-top" style="height: 200px; object-fit: cover;">
+                            <div class="card-body">
+                                <select class="form-control issue-type-select" data-index="${index}" required>
+                                    <option value="">-- Select Issue Type --</option>
+                                    {% for issue_type in issue_types %}
+                                    <option value="{{ issue_type.id }}">{{ issue_type.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                previewContainer.append(preview);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Handle remove button clicks
+    $(document).on('click', '.remove-btn', function() {
+        const index = $(this).data('index');
+        removeFile(index);
+    });
+
+    // Handle form submission
+    $('#uploadForm').on('submit', function(e) {
+        e.preventDefault();
+
+        // Build FormData with selectedFiles
+        const formData = new FormData();
+
+        // Add files
+        selectedFiles.forEach(file => {
+            formData.append('files[]', file);
+        });
+
+        // Add issue types in the same order
+        $('.issue-type-select').each(function(index) {
+            const typeId = $(this).val();
+            if (typeId) {
+                formData.append('issue_types[]', typeId);
+            }
+        });
+
+        $('#progressSection').show();
+        $('#uploadBtn').prop('disabled', true);
+
+        $.ajax({
+            url: '{{ url_for("upload.process_upload") }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            xhr: function() {
+                const xhr = new window.XMLHttpRequest();
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        $('#progressBar').css('width', percent + '%');
+                        $('#progressText').text('Uploading: ' + percent + '%');
+                    }
+                });
+                return xhr;
+            },
+            success: function(response) {
+                $('#progressText').text(`Success! Processed ${response.success} of ${response.total} files.`);
+                if (response.failed > 0) {
+                    $('#progressText').append(`<br><span class="text-warning">${response.failed} failed.</span>`);
+                }
+                setTimeout(function() {
+                    location.reload();
+                }, 2000);
+            },
+            error: function(xhr) {
+                alert('Upload failed: ' + (xhr.responseJSON ? xhr.responseJSON.error : 'Unknown error'));
+                $('#uploadBtn').prop('disabled', false);
+                $('#progressSection').hide();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

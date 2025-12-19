@@ -1,0 +1,171 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Map View{% endblock %}
+{% block page_title %}Issues Map View{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Filters</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label>Issue Type</label>
+                    <select class="form-control" id="filterIssueType">
+                        <option value="">All Types</option>
+                        {% for issue_type in issue_types %}
+                        <option value="{{ issue_type.id }}">{{ issue_type.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Date Range</label>
+                    <input type="date" class="form-control mb-2" id="filterDateFrom" placeholder="From">
+                    <input type="date" class="form-control" id="filterDateTo" placeholder="To">
+                </div>
+
+                <button class="btn btn-primary btn-block" id="applyFilters">
+                    <i class="fas fa-filter"></i> Apply Filters
+                </button>
+                <button class="btn btn-secondary btn-block" id="clearFilters">
+                    <i class="fas fa-times"></i> Clear Filters
+                </button>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title">Legend</h3>
+            </div>
+            <div class="card-body" id="mapLegend">
+                <div class="mb-2">
+                    <i class="fas fa-map-marker-alt" style="color: red;"></i> <span id="legendRed">Loading...</span>
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-map-marker-alt" style="color: orange;"></i> <span id="legendOrange">Loading...</span>
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-map-marker-alt" style="color: blue;"></i> <span id="legendBlue">Loading...</span>
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-map-marker-alt" style="color: green;"></i> <span id="legendGreen">Loading...</span>
+                </div>
+                <div class="mb-2">
+                    <i class="fas fa-map-marker-alt" style="color: purple;"></i> <span id="legendPurple">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-body p-0">
+                <div id="map" style="height: 700px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Initialize map centered on Bucharest
+    const map = L.map('map').setView([44.4268, 26.1025], 13);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Color palette for issue types
+    const colorPalette = ['red', 'orange', 'blue', 'green', 'purple', 'brown', 'pink', 'teal'];
+    const typeColors = {};
+    let colorIndex = 0;
+
+    function loadMarkers() {
+        // Get filter values
+        const params = {
+            issue_type: $('#filterIssueType').val(),
+            date_from: $('#filterDateFrom').val(),
+            date_to: $('#filterDateTo').val()
+        };
+
+        $.ajax({
+            url: '{{ url_for("map.get_markers") }}',
+            type: 'GET',
+            data: params,
+            success: function(markers) {
+                // Clear existing markers
+                map.eachLayer(function(layer) {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
+                    }
+                });
+
+                // Assign colors to issue types dynamically
+                const uniqueTypes = [...new Set(markers.map(m => m.type))];
+                uniqueTypes.forEach(function(type) {
+                    if (!typeColors[type]) {
+                        typeColors[type] = colorPalette[colorIndex % colorPalette.length];
+                        colorIndex++;
+                    }
+                });
+
+                // Update legend
+                $('#mapLegend').html('');
+                Object.keys(typeColors).forEach(function(type) {
+                    $('#mapLegend').append(`
+                        <div class="mb-2">
+                            <i class="fas fa-map-marker-alt" style="color: ${typeColors[type]};"></i> ${type}
+                        </div>
+                    `);
+                });
+
+                // Add new markers
+                markers.forEach(function(issue) {
+                    const color = typeColors[issue.type] || 'gray';
+                    const icon = L.divIcon({
+                        className: 'custom-marker',
+                        html: `<i class="fas fa-map-marker-alt fa-2x" style="color: ${color};"></i>`,
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41]
+                    });
+
+                    const marker = L.marker([issue.lat, issue.lng], { icon: icon }).addTo(map);
+
+                    const popupContent = `
+                        <div style="min-width: 200px;">
+                            <img src="${issue.image_url}" style="width: 100%; height: 150px; object-fit: cover; margin-bottom: 10px;">
+                            <strong>${issue.type}</strong><br>
+                            <small>${issue.timestamp}</small><br>
+                            <a href="/issues/${issue.id}" class="btn btn-sm btn-primary mt-2">View Details</a>
+                        </div>
+                    `;
+                    marker.bindPopup(popupContent);
+                });
+            }
+        });
+    }
+
+    // Load markers on page load
+    loadMarkers();
+
+    // Apply filters
+    $('#applyFilters').on('click', function() {
+        loadMarkers();
+    });
+
+    // Clear filters
+    $('#clearFilters').on('click', function() {
+        $('#filterIssueType').val('');
+        $('#filterDateFrom').val('');
+        $('#filterDateTo').val('');
+        loadMarkers();
+    });
+});
+</script>
+{% endblock %}

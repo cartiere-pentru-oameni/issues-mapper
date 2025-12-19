@@ -1,0 +1,110 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Issue #{{ issue.id }}{% endblock %}
+{% block page_title %}Issue Details{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Issue #{{ issue.id }}</h3>
+                <div class="card-tools">
+                    <a href="{{ url_for('issues.index') }}" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <img src="{{ issue.image_url }}" class="img-fluid" style="max-height: 500px;">
+                </div>
+
+                <table class="table table-bordered">
+                    <tbody>
+                        <tr>
+                            <th width="30%">Issue Type</th>
+                            <td>{{ issue.type }}</td>
+                        </tr>
+                        <tr>
+                            <th>Latitude</th>
+                            <td>{{ issue.latitude if issue.latitude else 'Not extracted' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Longitude</th>
+                            <td>{{ issue.longitude if issue.longitude else 'Not extracted' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Timestamp</th>
+                            <td>{{ issue.timestamp if issue.timestamp else 'Not extracted' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Uploaded</th>
+                            <td>{{ issue.created_at }}</td>
+                        </tr>
+                        {% if issue.extraction_error %}
+                        <tr>
+                            <th>Extraction Status</th>
+                            <td><span class="badge badge-danger">Failed</span></td>
+                        </tr>
+                        {% endif %}
+                        {% if issue.raw_extraction_text %}
+                        <tr>
+                            <th>Raw Extraction</th>
+                            <td><small class="text-muted">{{ issue.raw_extraction_text }}</small></td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Location</h3>
+            </div>
+            <div class="card-body p-0">
+                <div id="detailMap" style="height: 300px;"></div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header bg-danger">
+                <h3 class="card-title">Danger Zone</h3>
+            </div>
+            <div class="card-body">
+                <p>Once you delete an issue, there is no going back.</p>
+                <form method="POST" action="{{ url_for('issues.delete', issue_id=issue.id) }}" onsubmit="return confirm('Are you sure you want to delete this issue?');">
+                    <button type="submit" class="btn btn-danger btn-block">
+                        <i class="fas fa-trash"></i> Delete Issue
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    {% if issue.latitude and issue.longitude %}
+    // Initialize map
+    const lat = {{ issue.latitude }};
+    const lng = {{ issue.longitude }};
+    const map = L.map('detailMap').setView([lat, lng], 15);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    L.marker([lat, lng]).addTo(map);
+    {% else %}
+    // No coordinates available
+    $('#detailMap').html('<div class="p-3 text-center text-muted">No location data available</div>');
+    {% endif %}
+});
+</script>
+{% endblock %}
